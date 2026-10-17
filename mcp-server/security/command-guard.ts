@@ -3,7 +3,7 @@
  * P0-4 FIX: Command Guard with PathGuard + timeout + kill tree
  * mcp-server/security/command-guard.ts
  */
-import { PathGuard } from "./path-guard.js";
+import { PathGuard } from "./path-guard";
 import { execFile } from "child_process";
 import path from "path";
 
