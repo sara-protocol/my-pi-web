@@ -1,3 +1,5 @@
+[![CI](https://github.com/sara-protocol/my-pi-web/actions/workflows/ci.yml/badge.svg)](https://github.com/sara-protocol/my-pi-web/actions/workflows/ci.yml)
+
 # MY-PI-WEB
 
 MY-PI-WEB is a local web interface for an Ollama-backed coding assistant, with a separate MCP server for workspace tools and the SARA task lifecycle.
