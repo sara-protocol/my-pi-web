@@ -1,16 +1,41 @@
 
 import fs from "fs";
 import path from "path";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
-const execAsync = promisify(exec);
+import { PathGuard } from "../mcp-server/security/path-guard";
+import { evaluateCommand } from "../mcp-server/security/command-guard";
+const execFileAsync = promisify(execFile);
 
 const ROOT = process.cwd();
 
 function safe(p: string) {
-  const abs = path.resolve(ROOT, p);
-  if (!abs.startsWith(ROOT)) throw new Error("非法路径: " + p);
-  return abs;
+  return new PathGuard(ROOT).resolveAndValidate(p);
+}
+
+export function getRoot() { return ROOT; }
+
+export function listFiles(p: string) {
+  const dir = safe(p);
+  return fs.readdirSync(dir, { withFileTypes: true }).map((entry) => {
+    const entryPath = path.join(dir, entry.name);
+    const stat = fs.statSync(entryPath);
+    return { name: entry.name, isDir: entry.isDirectory(), size: stat.size, path: path.relative(ROOT, entryPath).split(path.sep).join("/") || "." };
+  });
+}
+
+export function readFileContent(p: string) {
+  return fs.readFileSync(safe(p), "utf-8");
+}
+
+export function writeFileContent(p: string, content: string) {
+  if (typeof content !== "string") throw new Error("content must be a string");
+  const file = safe(p);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  // Revalidate after parent creation so symlink changes cannot redirect the write.
+  const validated = safe(p);
+  fs.writeFileSync(validated, content, "utf-8");
+  return { path: path.relative(ROOT, validated).split(path.sep).join("/"), bytes: Buffer.byteLength(content, "utf8") };
 }
 
 export async function executeTool(name: string, args: any) {
@@ -34,7 +59,19 @@ export async function executeTool(name: string, args: any) {
     return `✅ 已写入 ${args.path} (${args.content.length} 字符)`;
   }
   if (name === "run_command") {
-    const { stdout, stderr } = await execAsync(args.command, { cwd: ROOT, timeout: 30000 });
+    if (typeof args.command !== "string" || !args.command.trim()) throw new Error("command is required");
+    const [binary, ...commandArgs] = args.command.trim().split(/\s+/);
+    const decision = evaluateCommand(binary, commandArgs, ROOT);
+    if (decision.decision !== "ALLOW" || !decision.absoluteBin) {
+      const prefix = decision.decision === "REVIEW" ? "Command needs approval" : "Command denied";
+      throw new Error(`${prefix}: ${decision.reason || binary}`);
+    }
+    const { stdout, stderr } = await execFileAsync(decision.absoluteBin, commandArgs, {
+      cwd: ROOT,
+      timeout: 10000,
+      maxBuffer: 1024 * 1024,
+      env: { PATH: process.env.PATH || "", HOME: process.env.HOME || "", NODE_ENV: process.env.NODE_ENV || "production" },
+    });
     return `⚡ ${args.command}\nSTDOUT:\n${stdout.slice(0,8000)}\nSTDERR:\n${stderr.slice(0,8000)}`.trim();
   }
   throw new Error(`未知工具: ${name}`);

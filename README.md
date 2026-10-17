@@ -1,220 +1,91 @@
-# MY-PI-WEB 2.0
+# MY-PI-WEB
 
-> Web UI for Pi Coding Agent + WEB MCP 2.0
+MY-PI-WEB is a local web interface for an Ollama-backed coding assistant, with a separate MCP server for workspace tools and the SARA task lifecycle.
 
-[Version](https://img.shields.io/badge/version-v2.0.0-blue)
-[MCP](https://img.shields.io/badge/MCP-WEB%20MCP%202.0-green)
-[License](https://img.shields.io/badge/license-MIT-lightgrey)
+> This repository is an active prototype. The login screen is a visual mock and does not authenticate users. Do not expose the web app or MCP server to an untrusted network.
 
-MY-PI-WEB 是一个为 Pi Coding Agent 打造的现代化 Web UI，内置 WEB MCP 2.0 服务器，让你可以用浏览器操作 Pi，同时让任何支持 MCP 的 AI 客户端直接调用。
+## What is implemented
 
----
+- **Next.js web app** on port `30141`: chat, session/file UI, and small example pages.
+- **Local agent**: `lib/local-agent.ts` calls Ollama (`qwen2.5-coder:7b` by default) and delegates workspace tools to `lib/file-tools.ts`.
+- **MCP service** on port `30142`: `mcp-server/index.ts` exposes workspace file operations, an allowlisted command tool, and SARA task tools over the MCP SSE transport.
+- **SARA task core**: persistent task lifecycle, session-scoped access, approval state, and SSE session management are implemented under `mcp-server/`.
 
-## ✨ 功能特性
+The web login page is not connected to MCP authentication. MCP validates one shared bearer token (`MCP_AUTH_TOKEN`); production requires it, and all MCP requests are rejected when no token is configured. This is not per-user authentication and does not protect the web API.
 
-- **Web UI** - 浏览器里直接操作 Pi，支持会话管理、文件浏览、实时终端
-- **WEB MCP 2.0** - 标准 SSE 协议的 MCP 服务器，可被 Claude Desktop / Cursor / Pi 等客户端调用
-- **双服务一键启动** - Web (30141) + MCP (30142) 双端口隔离，互不影响
-- **零配置** - `start.bat` 双击即用
+## Requirements
 
----
+- Node.js 20 or newer
+- npm
+- Ollama for chat functionality
 
-## 🚀 快速开始
-
-### 1. 克隆 & 安装
+## Run locally
 
 ```bash
-git clone https://github.com/sara-protocol/my-pi-web.git
-cd my-pi-web
-npm install
+npm ci
+ollama pull qwen2.5-coder:7b
+npm run dev
 ```
 
-### 2. 一键启动（Windows）
-
-双击 `start.bat`，会自动打开两个窗口：
-
-- Web UI: http://localhost:30141
-- MCP Server: http://localhost:30142/sse
-
-### 3. 手动启动
+Open <http://localhost:30141>. To start the MCP service in another terminal:
 
 ```bash
-# 启动 Web UI (端口 30141)
-npm run dev
-
-# 启动 WEB MCP 2.0 (端口 30142)
+$env:MCP_AUTH_TOKEN = "replace-with-a-random-token-at-least-16-characters"
 npm run dev:mcp
 ```
 
----
+On macOS/Linux, set the environment variable with `export MCP_AUTH_TOKEN=...` before `npm run dev:mcp`. To start both services with the helper scripts, set the token first, then run `start.bat` (Windows) or `bash start.sh` (macOS/Linux). The web app and MCP service bind to `127.0.0.1` by default. Set `MCP_BIND_HOST` only when you understand the network exposure and have configured authentication, TLS, and an explicit `MCP_CORS_ORIGIN` allowlist.
 
-## 🔌 WEB MCP 2.0 接入说明
+### Environment variables
 
-### 什么是 WEB MCP 2.0？
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama API URL used by the web agent |
+| `OLLAMA_MODEL` | `qwen2.5-coder:7b` | Model used by the web agent |
+| `MCP_BIND_HOST` | `127.0.0.1` | MCP bind address |
+| `MCP_PORT` | `30142` | MCP port |
+| `MCP_AUTH_TOKEN` | unset | Bearer token for MCP; required in production |
+| `MCP_CORS_ORIGIN` | `http://localhost:30141` | Comma-separated browser origin allowlist |
+| `MCP_ENABLE_RUN_COMMAND` | unset | Enables the MCP and local-agent command tools; commands still pass through the allowlist and path policy |
 
-WEB MCP 2.0 是基于 SSE (Server-Sent Events) 的 MCP (Model Context Protocol) 实现，让 AI 助手可以直接操作你的 Pi 项目。
+## MCP connection
 
-MCP 端点：
+The SSE endpoint is `http://localhost:30142/sse`. MCP clients must send `Authorization: Bearer <MCP_AUTH_TOKEN>` on the SSE connection and message requests. Configure the client to pass that header using the client's supported HTTP header setting. The exact configuration differs by client and version; verify header forwarding before relying on the connection. The server currently uses one shared token, not per-user identities or the Web login page.
 
-```
-http://localhost:30142/sse
-```
+The currently registered MCP tools are `list_files`, `read_file`, `write_file`, `run_command`, `create_task`, `list_tasks`, `get_task`, `approve_task`, `cancel_task`, and `count_tasks`. `run_command` is disabled unless explicitly enabled and only permits commands accepted by the command policy. High-risk task approvals are represented in the SARA lifecycle; a visual approval flow in the web UI is not implied by this API.
 
-健康检查：
-
-```bash
-curl http://localhost:30142/
-# 返回: {"name": "MY-PI-WEB WEB MCP 2.0", "sse": "/sse"}
-```
-
-### 接入方式
-
-#### 1) Pi Coding Agent
-
-在你的 Pi 配置文件 `~/.pi/config.json` 或项目 `.pi/settings.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "my-pi-web": {
-      "url": "http://localhost:30142/sse",
-      "transport": "sse"
-    }
-  }
-}
-```
-
-#### 2) Claude Desktop
-
-编辑 `claude_desktop_config.json`：
-
-Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "my-pi-web": {
-      "command": "npx",
-      "args": ["mcp-remote", "http://localhost:30142/sse"]
-    }
-  }
-}
-```
-
-> 需要先安装 `mcp-remote`: `npm install -g mcp-remote`
-
-#### 3) Cursor
-
-在 Cursor 的 `Settings > Features > MCP Servers` 添加：
-
-```json
-{
-  "my-pi-web": {
-    "url": "http://localhost:30142/sse"
-  }
-}
-```
-
-#### 4) 公网部署
-
-如果你要部署到服务器，将 localhost 换成你的域名，并确保 30142 端口开放：
-
-```json
-{
-  "mcpServers": {
-    "my-pi-web": {
-      "url": "https://your-domain.com:30142/sse"
-    }
-  }
-}
-```
-
-建议使用 Nginx 反向代理 + HTTPS：
-
-```nginx
-location /sse {
-  proxy_pass http://127.0.0.1:30142/sse;
-  proxy_set_header Connection "";
-  proxy_http_version 1.1;
-  proxy_buffering off;
-  proxy_cache off;
-  proxy_set_header Host $host;
-}
-```
-
----
-
-## 🛠️ 可用工具 (MCP Tools)
-
-WEB MCP 2.0 目前暴露以下工具：
-
-| 工具 | 说明 |
-|------|------|
-| `list_sessions` | 列出所有 Pi 会话 |
-| `read_file` | 读取项目文件 |
-| `write_file` | 写入项目文件 |
-| `run_command` | 执行终端命令 |
-| `web_browse` | 浏览器预览 |
-
-> 更多工具持续开发中，欢迎 PR！
-
----
-
-## 📁 项目结构
-
-```
-my-pi-web/
-├── app/                # Next.js Web UI
-├── components/         # React 组件
-├── lib/                # 工具库
-├── mcp-server/         # WEB MCP 2.0 服务器 (端口 30142)
-│   ├── index.ts        # MCP 入口
-│   └── tools/          # MCP 工具定义
-├── .github/workflows/  # GitHub Action 自动发布
-├── start.bat           # Windows 一键启动
-├── start.sh            # Mac/Linux 一键启动
-└── package.json
-```
-
----
-
-## 🔧 开发
+## Development and checks
 
 ```bash
-# 安装依赖
-npm install
-
-# 开发模式
-npm run dev          # Web
-npm run dev:mcp      # MCP
-
-# 构建
+npm ci
+npm run typecheck
+npm test
 npm run build
 ```
 
----
+`npm test` runs the Vitest suite under `mcp-server/` and `tests/e2e/`. GitHub Actions runs the same checks for pull requests and pushes to `main`; failures block the workflow.
 
-## 📦 发布
+## Project layout
 
-```bash
-git tag v2.0.0
-git push origin v2.0.0
+```text
+app/                    Next.js pages and API routes
+components/             Chat, file explorer, and session UI
+lib/                    Ollama agent and web workspace tools
+mcp-server/security/    Path, command, authentication, and audit policy
+mcp-server/transport/   MCP session and SSE transport management
+mcp-server/sara/        SARA task service
+mcp-server/task-core.ts Persistent task lifecycle
+tests/e2e/              SARA end-to-end tests
 ```
 
-推送 tag 会自动触发 GitHub Action 创建 Release。
+## Security notes
 
----
+- Keep the MCP listener on loopback unless remote access is deliberately configured.
+- Use a high-entropy `MCP_AUTH_TOKEN`; do not commit it or put it in a URL.
+- Keep `MCP_ENABLE_RUN_COMMAND` disabled unless needed.
+- Treat the web login page as a mock. It does not protect the web API; the web app binds to loopback to limit network exposure.
+- Keep `MCP_ENABLE_RUN_COMMAND` unset unless command execution is needed. The MCP and local-agent tools share the command policy and execute arguments without a shell.
 
-## 🙏 致谢
+## License
 
-- [Pi Coding Agent](https://github.com/badlogic/pi-mono) - 强大的终端编程助手
-- [Model Context Protocol](https://modelcontextprotocol.io) - 开放的 MCP 标准
-
----
-
-## 📄 License
-
-MIT © sara-protocol
-
-**MY-PI-WEB 2.0** - 让 Pi 拥有 Web 灵魂 🚀
+MIT. See the repository license terms.

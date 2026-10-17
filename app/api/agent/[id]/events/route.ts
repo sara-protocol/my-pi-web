@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         controller.enqueue(encoder.encode(data));
       };
       try {
-        await runLocalAgent(sessionId, message, send);
+        await runLocalAgent(message, sessionId, send);
       } catch (e:any) {
         send({ type: 'text', text: `\nError: ${e.message}` });
         send({ type: 'done' });

@@ -13,14 +13,14 @@ const SYSTEM = `你是 my-pi-web v1.3 本地离线编程助手。
 重要规则：列出或读取文件后，必须用自然语言总结结果，不要重复调用同一个工具！`;
 function extractToolFromContent(content: string): {name:string, arguments:any} | null {
   try {
-    const m = content.match(/\{\s*"?name"?\s*:\s*"([^"]+)"\s*,\s*"?arguments"?\s*:\s*(\{[^}]*\})/s);
+    const m = content.match(/\{\s*"?name"?\s*:\s*"([^"]+)"\s*,\s*"?arguments"?\s*:\s*(\{[\s\S]*\})/);
     if (m) return { name: m[1], arguments: JSON.parse(m[2]) };
     const obj = JSON.parse(content.trim());
     if (obj.name && obj.arguments) return { name: obj.name, arguments: obj.arguments };
   } catch {}
   return null;
 }
-export async function runLocalAgent(userMessage: string, sessionId: string) {
+export async function runLocalAgent(userMessage: string, sessionId: string, onEvent?: (event: any) => void) {
   const messages: any[] = [{ role: "system", content: SYSTEM }, { role: "user", content: userMessage }];
   const collected: any[] = [];
   const seen = new Set<string>();
@@ -46,15 +46,18 @@ export async function runLocalAgent(userMessage: string, sessionId: string) {
         seen.add(key);
         didNew = true;
         collected.push({ tool_call: { name: fn.name, arguments: fn.arguments } });
+        onEvent?.({ type: "tool_call", name: fn.name, arguments: fn.arguments });
         try {
           const result = await executeTool(fn.name, fn.arguments);
           const toolResultMsg = { role: "tool", content: typeof result === "string" ? result : JSON.stringify(result).slice(0,12000) };
           messages.push(toolResultMsg);
           collected.push({ tool_result: toolResultMsg.content, tool_name: fn.name });
+          onEvent?.({ type: "tool_result", name: fn.name, content: toolResultMsg.content });
         } catch (e:any) {
           const err = e?.message || String(e);
           messages.push({ role: "tool", content: `Error: ${err}` });
           collected.push({ tool_result: `Error: ${err}`, tool_name: fn.name, is_error: true });
+          onEvent?.({ type: "tool_result", name: fn.name, content: `Error: ${err}`, is_error: true });
         }
       }
       if (!didNew) {
@@ -64,6 +67,7 @@ export async function runLocalAgent(userMessage: string, sessionId: string) {
       continue;
     } else {
       collected.push({ content: msg.content || "✅ 完成" });
+      onEvent?.({ type: "text", text: msg.content || "✅ 完成" });
       break;
     }
   }

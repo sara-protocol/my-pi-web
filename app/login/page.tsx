@@ -20,7 +20,7 @@ export default function LoginPage() {
           <div className="mb-8">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-cyan-400 flex items-center justify-center text-xl font-black">π</div>
             <h1 className="text-3xl font-black tracking-tight mt-4">欢迎回来</h1>
-            <p className="text-sm opacity-60 mt-2">my-pi-web v1.3 • 本地离线登录</p>
+            <p className="text-sm opacity-60 mt-2">界面预览 • 认证功能尚未接入</p>
           </div>
 
           <div className="space-y-4">
@@ -36,24 +36,24 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <button onClick={()=>alert(`登录: ${user}`)} className="w-full mt-2 bg-white text-black rounded-xl py-3 font-bold text-sm hover:bg-zinc-200 transition shadow-[0_10px_30px_rgba(255,255,255,0.2)]">
-              登录 Login →
+            <button disabled className="w-full mt-2 bg-white/50 text-black/60 rounded-xl py-3 font-bold text-sm cursor-not-allowed">
+              登录功能尚未接入
             </button>
 
             <div className="flex justify-between text-[11px] opacity-50 mt-3">
-              <a className="hover:opacity-100 hover:underline">忘记密码?</a>
+              <span className="opacity-50">忘记密码功能未接入</span>
               <Link href="/" className="hover:opacity-100 hover:underline">← 返回首页</Link>
             </div>
           </div>
 
           <div className="mt-8 pt-6 border-t border-white/10 flex gap-2">
-            <div className="flex-1 bg-white/5 rounded-xl p-3 text-[10px]"><div className="opacity-50">STATUS</div><div className="text-emerald-400 font-bold">● Ollama 在线</div></div>
-            <div className="flex-1 bg-white/5 rounded-xl p-3 text-[10px]"><div className="opacity-50">MODEL</div><div className="font-bold">qwen2.5-coder:7b</div></div>
+            <div className="flex-1 bg-white/5 rounded-xl p-3 text-[10px]"><div className="opacity-50">STATUS</div><div className="text-amber-300 font-bold">未检测</div></div>
+            <div className="flex-1 bg-white/5 rounded-xl p-3 text-[10px]"><div className="opacity-50">默认模型</div><div className="font-bold">qwen2.5-coder:7b</div></div>
           </div>
         </div>
 
         <div className="mt-6 text-center text-[10px] opacity-30">
-          完全离线 • 不上传代码 • write_file + run_command 验证
+          登录界面演示 • 不提供认证或访问控制
         </div>
       </div>
     </div>

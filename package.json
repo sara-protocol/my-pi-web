@@ -1,28 +1,33 @@
 {
-  "name": "my-pi-web-mvp",
-  "version": "1.1.0",
+  "name": "my-pi-web",
+  "version": "2.2.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 30141",
+    "dev": "next dev --hostname 127.0.0.1 -p 30141",
     "build": "next build",
-    "start": "next start -p 30141",
+    "start": "next start --hostname 127.0.0.1 -p 30141",
     "lint": "next lint",
-    "dev:mcp": "tsx mcp-server/index.ts"
+    "dev:mcp": "tsx mcp-server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.10",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "cors": "^2.8.6",
     "express": "^5.3.0",
-    "next": "15.3.5",
+    "next": "15.5.28",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "tsx": "^4.23.15"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^5.0.5"
   }
 }
